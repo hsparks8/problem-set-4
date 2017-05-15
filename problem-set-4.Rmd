@@ -1,7 +1,7 @@
 ---
 title: "Problem Set 4"
-author: "Your Name Here"
-date: "3/9/2017"
+author: "Hayley Sparks"
+date: "5/15/2017"
 output: html_document
 ---
 
@@ -27,8 +27,8 @@ You will analyze some data in the [`nihexporter`](https://github.com/jayhesselbe
 
 First you need to install the `nihexporter` package (and `devtools`, if you don't have it already).
 
-```r
-# install.packages('devtools')
+```{r overview}
+install.packages('devtools')
 devtools::install_github("jayhesselberth/nihexporter")
 ```
 
@@ -50,10 +50,10 @@ project_io
 The `projects` and `project_io` tables have the `r intersect(names(projects), names(project_io))` column in common. Use this column to perform a `left_join` and identify the most expensive project for each institute. Project institutes are in the `projects` table, whereas total project costs are available in the `project_io` table. Note you will have to use the `arrange` and `slice` verbs from `dplyr`.
 
 ```{r problem_1, eval=FALSE}
-... %>%
-  left_join(...) %>%
-  arrange(...) %>%
-  slice(...)
+  projects %>% select(project.num,institute) %>% left_join(project_io) %>% select(project.num, institute, total.cost) -> merge.proj
+  group_by(merge.proj, institute) %>% arrange(desc(total.cost)) %>% slice(1:1) -> top_expense
+
+top_expense
 ```
 
 ## Problem 2
@@ -61,15 +61,17 @@ The `projects` and `project_io` tables have the `r intersect(names(projects), na
 Create a plot that describes the change in output (number of publications) for the most expensive grant from the above list. Note that you cannot use `n.pubs` for this, as that is an aggregate count over time. You need a tbl of following structure, which you can then use to calculate the number of publications each year (hint: use `n()` in a `summarize` statement:
 
 ```{r p2_tbl}
-projects %>%
-  head() %>%
-  left_join(publinks) %>%
-  left_join(publications) %>%
-  select(project.num, fiscal.year, fy.cost, pmid) %>%
-  na.omit()
+top_expense %>% ungroup() %>% arrange(desc(total.cost)) %>% slice(1:1) -> top_projects
+
+projects %>% semi_join(top_projects, by = "project.num") %>% left_join(publinks) %>% left_join(publications) %>% select(project.num, pub.year, fy.cost, pmid) %>% na.omit() -> top_projects
+
+top_projects
 ```
 
 ```{r problem_2}
+top_projects %>% group_by(pub.year) %>% summarise(total.pubs = n ())-> pubs_per_year
+
+pubs_per_year %>% ggplot(aes(pub.year, total.pubs)) + geom_line() + geom_point() + theme_bw()
 ```
 
 ## Problem 3
@@ -77,6 +79,9 @@ projects %>%
 Use the `projects` and `clinical_studies` table to calculate how many clinical studies have been started by projects from each institute.
 
 ```{r problem_3}
+select(projects, institute, project.num) %>% left_join(clinical_studies) %>% na.omit() %>% select(institute, project.num, trial.id) %>% group_by(institute, project.num) %>% summarise(total.studies = n()) %>% arrange(desc(total.studies)) -> projects_tbl
+
+projects_tbl
 ```
 
 ## Problem 4
@@ -84,9 +89,7 @@ Use the `projects` and `clinical_studies` table to calculate how many clinical s
 Calculate correlations between `total.cost` and `n.pubs` for each institute. You will need to `join` the `projects` and `project_io` tables to link `institute` with `total.cost` and `n.pubs`. You will then need to use `group_by` and `do` from `dplyr` and `tidy` from `broom` to calculate correlations.
 
 ```{r problem_2, eval=FALSE}
-tab %>%
-  group_by(...) %>%
-  do(tidy(cor(..., ...)))
+projects %>% left_join(project_io) %>% na.omit() %>% select(institute, total.cost, n.pubs) %>% group_by(institute) %>% do(tidy(cor(.$total.cost, .$n.pubs))) %>% arrange(desc(x))
 ```
 
 ## Problem 5 (extra credit)
